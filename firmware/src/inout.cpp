@@ -7,9 +7,17 @@
 
 static OneWire temp1OneWire(PIN_TEMP_1);
 static DallasTemperature temp1Sensor(&temp1OneWire);
+static DeviceAddress temp1DeviceAddress;
+static unsigned long lastTemp1Request = 0;
+static float temperature1 = 0.0;
 
 static OneWire temp2OneWire(PIN_TEMP_2);
 static DallasTemperature temp2Sensor(&temp2OneWire);
+static DeviceAddress temp2DeviceAddress;
+static unsigned long lastTemp2Request = 0;
+static float temperature2 = 0.0;
+
+static int  delayInMillis = 0;
 
 /**
  * Configure in/out ports
@@ -30,7 +38,19 @@ void setup_inputs_outputs()
 
     //Temperature sensors
     temp1Sensor.begin();
+    temp1Sensor.getAddress(temp1DeviceAddress, 0);
+    temp1Sensor.setResolution(temp1DeviceAddress, TEMP_RESOLUTION);
+    temp1Sensor.setWaitForConversion(false);
+    temp1Sensor.requestTemperatures();
+    delayInMillis = 750 / (1 << (12 - TEMP_RESOLUTION)); 
+    lastTemp1Request = millis(); 
+
     temp2Sensor.begin();
+    temp2Sensor.getAddress(temp2DeviceAddress, 0);
+    temp2Sensor.setResolution(temp2DeviceAddress, TEMP_RESOLUTION);
+    temp2Sensor.setWaitForConversion(false);
+    temp2Sensor.requestTemperatures();
+    lastTemp2Request = millis(); 
 }
 
 void set_fan_speed(int channel, double percent)
@@ -45,12 +65,24 @@ void set_fan_speed(int channel, double percent)
 
 double getTemperature1()
 {
-    temp1Sensor.requestTemperatures();
-    return temp1Sensor.getTempCByIndex(0);
+    unsigned long now = millis();
+    if (now - lastTemp1Request >= delayInMillis) // waited long enough??
+    {
+        temperature1 = temp1Sensor.getTempCByIndex(0);
+        temp1Sensor.requestTemperatures();
+        lastTemp1Request = now;
+    }
+    return temperature1;
 }
 
 double getTemperature2()
 {
-    temp2Sensor.requestTemperatures();
-    return temp2Sensor.getTempCByIndex(0);
+    unsigned long now = millis();
+    if (now - lastTemp2Request >= delayInMillis) // waited long enough??
+    {
+        temperature2 = temp2Sensor.getTempCByIndex(0);
+        temp2Sensor.requestTemperatures();
+        lastTemp2Request = now;
+    }
+    return temperature2;
 }

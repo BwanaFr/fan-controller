@@ -2,6 +2,7 @@
 #define _INOUT_H_
 #include <cstdint>
 
+#define TEMP_RESOLUTION 12
 
 /**
  * Setups the I/O (digital and analog)
