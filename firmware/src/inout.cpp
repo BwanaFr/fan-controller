@@ -5,19 +5,42 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-static OneWire temp1OneWire(PIN_TEMP_1);
-static DallasTemperature temp1Sensor(&temp1OneWire);
-static DeviceAddress temp1DeviceAddress;
-static unsigned long lastTemp1Request = 0;
-static float temperature1 = 0.0;
+class DallasTemperatureAsync {
+private:
+    DallasTemperature sensor;
+    OneWire oneWire;
+    DeviceAddress deviceAddress;
+    unsigned long lastTempRequest;
+    float temperature;
+    int delayInMillis;
+public:    
+    DallasTemperatureAsync(uint8_t pin) :  oneWire(pin), sensor(&oneWire)
+    {
+        sensor.begin();
+        sensor.getAddress(deviceAddress, 0);
+        sensor.setResolution(deviceAddress, TEMP_RESOLUTION);
+        sensor.setWaitForConversion(false);
+        sensor.requestTemperatures();
+        delayInMillis = 750 / (1 << (12 - TEMP_RESOLUTION)); 
+        lastTempRequest = millis(); 
+    }
+    virtual ~DallasTemperatureAsync(){}
 
-static OneWire temp2OneWire(PIN_TEMP_2);
-static DallasTemperature temp2Sensor(&temp2OneWire);
-static DeviceAddress temp2DeviceAddress;
-static unsigned long lastTemp2Request = 0;
-static float temperature2 = 0.0;
+    float getTemperature(){
+        unsigned long now = millis();
+        if (now - lastTempRequest >= delayInMillis) // waited long enough??
+        {
+            temperature = sensor.getTempCByIndex(0);
+            sensor.requestTemperatures();
+            lastTempRequest = now;
+        }
+        return temperature;
+    }
+};
 
-static int  delayInMillis = 0;
+
+static DallasTemperatureAsync temp1Sensor(PIN_TEMP_1);
+static DallasTemperatureAsync temp2Sensor(PIN_TEMP_2);
 
 /**
  * Configure in/out ports
@@ -36,21 +59,9 @@ void setup_inputs_outputs()
         pinMode(PIN_USER_LED, OUTPUT);
     }
 
-    //Temperature sensors
-    temp1Sensor.begin();
-    temp1Sensor.getAddress(temp1DeviceAddress, 0);
-    temp1Sensor.setResolution(temp1DeviceAddress, TEMP_RESOLUTION);
-    temp1Sensor.setWaitForConversion(false);
-    temp1Sensor.requestTemperatures();
-    delayInMillis = 750 / (1 << (12 - TEMP_RESOLUTION)); 
-    lastTemp1Request = millis(); 
-
-    temp2Sensor.begin();
-    temp2Sensor.getAddress(temp2DeviceAddress, 0);
-    temp2Sensor.setResolution(temp2DeviceAddress, TEMP_RESOLUTION);
-    temp2Sensor.setWaitForConversion(false);
-    temp2Sensor.requestTemperatures();
-    lastTemp2Request = millis(); 
+    //User input
+    pinMode(PIN_FORCE_ON, INPUT_PULLUP);
+    pinMode(PIN_FORCE_OFF, INPUT_PULLUP);
 }
 
 void set_fan_speed(int channel, double percent)
@@ -65,24 +76,20 @@ void set_fan_speed(int channel, double percent)
 
 double getTemperature1()
 {
-    unsigned long now = millis();
-    if (now - lastTemp1Request >= delayInMillis) // waited long enough??
-    {
-        temperature1 = temp1Sensor.getTempCByIndex(0);
-        temp1Sensor.requestTemperatures();
-        lastTemp1Request = now;
-    }
-    return temperature1;
+    return temp1Sensor.getTemperature();
 }
 
 double getTemperature2()
 {
-    unsigned long now = millis();
-    if (now - lastTemp2Request >= delayInMillis) // waited long enough??
-    {
-        temperature2 = temp2Sensor.getTempCByIndex(0);
-        temp2Sensor.requestTemperatures();
-        lastTemp2Request = now;
-    }
-    return temperature2;
+    return temp2Sensor.getTemperature();
+}
+
+bool getForcedInput()
+{
+    return !digitalRead(PIN_FORCE_ON);
+}
+
+bool getOffInput()
+{
+    return !digitalRead(PIN_FORCE_OFF);
 }

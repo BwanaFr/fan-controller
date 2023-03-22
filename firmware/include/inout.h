@@ -18,13 +18,27 @@ void set_fan_speed(int channel, double percent);
 
 /**
  * Gets temperature 1 sensor
+ * @return temperature 1 sensor
 */
 double getTemperature1();
 
 /**
  * Gets temperature 2 sensor
+ * @return temperature 2 sensor
 */
 double getTemperature2();
+
+/**
+ * Gets the forced (on) input status
+ * @return True when the input is active
+*/
+bool getForcedInput();
+
+/**
+ * Gets the off input status
+ * @return True when the input is active
+*/
+bool getOffInput();
 
 
 #endif

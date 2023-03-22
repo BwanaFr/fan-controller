@@ -51,7 +51,7 @@ enum class OperatingMode {Off /*No operating mode */, Auto /* Automatic mode */,
 OperatingMode operatingMode = OperatingMode::Off;         // Fan operating mode
 static unsigned long lastParameterChange = 0;             // Last time one saved parameter was changed (to delay the saving)
 const unsigned long delayedParameterSaving = 10L * 1000L; // Delay before saving parameters to flash
-double actualPercentage = 0.0;                            // Actual fan percentage
+bool fansOn = false;                                      // Are fans on?
 double temperature1 = 0.0;                                // Temperature 1 sensor value
 double temperature2 = 0.0;                                // Temperature 2 sensor value
 bool autoOnReached = false;                               // Threshold reached in auto mode
@@ -82,7 +82,11 @@ bool changeMode(const String& newMode) {
     ret = true;
   }
   if(ret){
-    operMode.setValue(newMode.c_str());
+    if(operMode.toString() != newMode){
+      operMode.setValue(newMode.c_str());
+        //Delay saving to flash
+        lastParameterChange = millis();
+    }
   }
   return ret;
 }
@@ -99,9 +103,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
   String strTopic(topic);
   bool saveSettings = false;
   if(strTopic == (mqttFanService + "/mode")){
-    if(changeMode(data)){
-      saveSettings = true;
-    }
+    changeMode(data);
   }else if(strTopic == (mqttFanService + "/percentage")){
     fanPercent.setValue(data.toDouble());
     saveSettings = true;
@@ -118,7 +120,6 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
       }else{
         changeMode("Off");        
       }
-      saveSettings = true;
     }
   }
 
@@ -222,7 +223,6 @@ void mqtt_reconnect() {
       mqttState = MQTTConState::Connected;
       //Subscribe to MQTT topics
       client.subscribe((mqttFanService + "/mode").c_str());
-      Serial.println("Subscribing to " + (mqttFanService + "/mode"));
       client.subscribe((mqttFanService + "/percentage").c_str());
       client.subscribe((mqttFanService + "/set").c_str());
     } else {
@@ -249,15 +249,15 @@ void publishValuesToMQTT(){
   if(client.connected()){
     String msg;
     StaticJsonDocument<210> root;
-    root["percentage"] = actualPercentage;
+    root["percentage"] = fanPercent.getValue();
     root["temperature1"] = temperature1;
     root["temperature2"] = temperature2;
     root["offTemperature"] = offTemperature.getValue();
     root["onTemperature"] = onTemperature.getValue();
     root["mode"] = operMode.toString();
+    root["state"] = fansOn ? "on" : "off";
     serializeJson(root, msg);
     client.publish(mqttStatusService.c_str(), msg.c_str());
-    Serial.println(msg);
   }
 }
 
@@ -267,43 +267,54 @@ void publishValuesToMQTT(){
 void fan_process() {
   temperature1 = getTemperature1();
   temperature2 = getTemperature2();
+
+  if(getForcedInput() && (operatingMode != OperatingMode::Forced)){
+    //User switched to forced mode by using button
+    changeMode("Forced");
+  }else if(getOffInput() && (operatingMode != OperatingMode::Off)){
+    //User switched to off mode by using button
+    changeMode("Off");
+  }
+
   switch (operatingMode)
   {
   case OperatingMode::Off:
-    actualPercentage = 0.0;
+    fansOn = false;
     break;
   case OperatingMode::Auto:
+    //Automatic mode, do hysteresis
     if(temperature1 >= onTemperature.getValue()){
       autoOnReached = true;
     }else if(autoOnReached && (temperature1 < offTemperature.getValue())){
       autoOnReached = false;
     }
-    if(autoOnReached){
-      actualPercentage = fanPercent.getValue();
-    }else{
-      actualPercentage = 0.0;
-    }
+    fansOn = autoOnReached;
     break;
   case OperatingMode::Forced:
-    actualPercentage = fanPercent.getValue();
+    fansOn = true;
     break;  
   default:
     break;
   }
-  double percentFan1 = actualPercentage + fan1Offset.getValue();
-  if(percentFan1 > 100.0){
-    percentFan1 = 100.0;
-  }else if(percentFan1 < 0.0){
-    percentFan1 = 0.0;
+  if(fansOn){
+    double percentFan1 = fanPercent.getValue() + fan1Offset.getValue();
+    if(percentFan1 > 100.0){
+      percentFan1 = 100.0;
+    }else if(percentFan1 < 0.0){
+      percentFan1 = 0.0;
+    }
+    double percentFan2 = fanPercent.getValue() + fan2Offset.getValue();
+    if(percentFan2 > 100.0){
+      percentFan2 = 100.0;
+    }else if(percentFan2 < 0.0){
+      percentFan2 = 0.0;
+    }
+    set_fan_speed(1, percentFan1);
+    set_fan_speed(2, percentFan2);
+  }else{
+    set_fan_speed(1, 0.0);
+    set_fan_speed(2, 0.0);
   }
-  double percentFan2 = actualPercentage + fan2Offset.getValue();
-  if(percentFan2 > 100.0){
-    percentFan2 = 100.0;
-  }else if(percentFan2 < 0.0){
-    percentFan2 = 0.0;
-  }
-  set_fan_speed(1, percentFan1);
-  set_fan_speed(2, percentFan2);
 }
 
 /**
@@ -324,23 +335,26 @@ void setup() {
 
 void loop() {
   unsigned long now = millis();
+  bool publishToMQTT = false;
   
-  fan_process();
-
   //MQTT loop
   if (mqttState != MQTTConState::NotUsed){
-      if(!client.loop()) {
-        //Not connected of problem with updates
-        mqtt_reconnect();
-      }else{
-        //Ok, we can publish
-        if((now-mqttLastPostTime)>mqttPostingInterval){
-          publishValuesToMQTT();
-          mqttLastPostTime = now;
-        }
-      }
+    publishToMQTT = client.loop();
+    if(!publishToMQTT) {
+      //Not connected of problem with updates
+      mqtt_reconnect();
+    }
   }
   
+  // Call process
+  fan_process();
+
+  //Publish to MQTT if it's time to do
+  if(publishToMQTT && ((now-mqttLastPostTime)>mqttPostingInterval)){
+    publishValuesToMQTT();
+    mqttLastPostTime = now;
+  }
+
   //Delayed parameter saving
   if((lastParameterChange != 0) && ((now-lastParameterChange)>delayedParameterSaving)){
     lastParameterChange = 0;
