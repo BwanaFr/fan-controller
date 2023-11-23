@@ -412,15 +412,5 @@ void loop() {
     lastParameterChange = 0;
     captivePortal.saveParameters();
   }
-
-  if((now - lastBlink) > 500){
-    if((now - lastBlink) > 700){
-      digitalWrite(PIN_USER_LED, LOW);
-      lastBlink = now;
-    }else{
-      digitalWrite(PIN_USER_LED, HIGH);
-    }
-  }
-
   yield();
 }
