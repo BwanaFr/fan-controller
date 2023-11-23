@@ -52,7 +52,7 @@ void setup_inputs_outputs()
     ledcSetup(1, PWM_FREQUENCY, PWM_RESOLUTION_BITS);
     ledcAttachPin(PIN_FAN1, 1);
     ledcSetup(2, PWM_FREQUENCY, PWM_RESOLUTION_BITS);
-    ledcAttachPin(PIN_FAN1, 2);
+    ledcAttachPin(PIN_FAN2, 2);
 
     //Led for captive portal
     if(PIN_USER_LED >= 0){

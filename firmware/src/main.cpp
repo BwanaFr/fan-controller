@@ -11,6 +11,7 @@
 
 //ESPEasyCfg includes
 #include <ESPEasyCfg.h>
+#include <Update.h>
 
 //MQTT includes
 #include <PubSubClient.h>
@@ -55,6 +56,52 @@ bool fansOn = false;                                      // Are fans on?
 double temperature1 = 0.0;                                // Temperature 1 sensor value
 double temperature2 = 0.0;                                // Temperature 2 sensor value
 bool autoOnReached = false;                               // Threshold reached in auto mode
+
+static size_t otaContentLenght=0;                    // Size of the OTA update file
+
+/**
+ * Setups OTA update
+*/
+void setup_ota_update() {
+  server.on("/www/update", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "text/html", "<html><body><form method='POST' action='/www/update' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form></body></html>");
+  });
+  server.on("/www/update", HTTP_POST,
+    [](AsyncWebServerRequest *request) {},
+    [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+                    if (!index){
+                      otaContentLenght = request->contentLength();
+                      Serial.printf("Update with lenght of %d bytes\n", otaContentLenght);
+                      // if filename includes spiffs, update the spiffs partition
+                      int cmd = (filename.indexOf("spiffs") > -1) ? U_SPIFFS : U_FLASH;
+                      if (!Update.begin(otaContentLenght, cmd)) {
+                        Update.printError(Serial);
+                      }
+                    }
+
+                    if (Update.write(data, len) != len) {
+                      Update.printError(Serial);
+                    } else {
+                      Serial.printf("Progress: %d%%\n", (Update.progress()*100)/Update.size());
+                    }
+
+                    if (final) {
+                      AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "Please wait while the device reboots");
+                      response->addHeader("Refresh", "20");
+                      response->addHeader("Location", "/");
+                      request->send(response);
+                      if (!Update.end(true)){
+                        Update.printError(Serial);
+                      } else {
+                        Serial.println("Update complete");
+                        Serial.flush();
+                        ESP.restart();
+                      }
+                    }
+                  }
+  );
+}
+
 /**
  * Callback to get captive-portal messages
 */
@@ -224,6 +271,8 @@ void mqtt_reconnect() {
       //Subscribe to MQTT topics
       client.subscribe((mqttFanService + "/mode").c_str());
       client.subscribe((mqttFanService + "/percentage").c_str());
+      client.subscribe((mqttFanService + "/auto_off_temp").c_str());
+      client.subscribe((mqttFanService + "/auto_on_temp").c_str());
       client.subscribe((mqttFanService + "/set").c_str());
     } else {
       Serial.print("failed, rc=");
@@ -325,6 +374,8 @@ void setup() {
   Serial.println("Starting awesome fan controller!");
   //Setup I/O
   setup_inputs_outputs();
+  //OTA
+  setup_ota_update();
   //Initialize captive portal
   captive_portal_setup();
   //Initialize MQTT
@@ -333,6 +384,7 @@ void setup() {
   changeMode(operMode.toString());
 }
 
+unsigned long lastBlink = 0;
 void loop() {
   unsigned long now = millis();
   bool publishToMQTT = false;
@@ -359,6 +411,15 @@ void loop() {
   if((lastParameterChange != 0) && ((now-lastParameterChange)>delayedParameterSaving)){
     lastParameterChange = 0;
     captivePortal.saveParameters();
+  }
+
+  if((now - lastBlink) > 500){
+    if((now - lastBlink) > 700){
+      digitalWrite(PIN_USER_LED, LOW);
+      lastBlink = now;
+    }else{
+      digitalWrite(PIN_USER_LED, HIGH);
+    }
   }
 
   yield();
