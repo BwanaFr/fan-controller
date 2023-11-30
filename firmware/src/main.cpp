@@ -9,6 +9,8 @@
 #include "inout.h"
 #include "pin_config.h"
 
+#include "Logger.h"
+
 //ESPEasyCfg includes
 #include <ESPEasyCfg.h>
 #include <Update.h>
@@ -59,19 +61,21 @@ bool autoOnReached = false;                               // Threshold reached i
 
 static size_t otaContentLenght=0;                    // Size of the OTA update file
 
+Logger logger;
+
 /**
  * Setups OTA update
 */
 void setup_ota_update() {
   server.on("/www/update", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(200, "text/html", "<html><body><form method='POST' action='/www/update' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form></body></html>");
+    request->send(200, "text/html", "<html><body><div>OTA version 1</div><form method='POST' action='/www/update' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form></body></html>");
   });
   server.on("/www/update", HTTP_POST,
     [](AsyncWebServerRequest *request) {},
     [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
                     if (!index){
                       otaContentLenght = request->contentLength();
-                      Serial.printf("Update with lenght of %d bytes\n", otaContentLenght);
+                      logger.printf("Update with lenght of %d bytes\n", otaContentLenght);
                       // if filename includes spiffs, update the spiffs partition
                       int cmd = (filename.indexOf("spiffs") > -1) ? U_SPIFFS : U_FLASH;
                       if (!Update.begin(otaContentLenght, cmd)) {
@@ -82,7 +86,7 @@ void setup_ota_update() {
                     if (Update.write(data, len) != len) {
                       Update.printError(Serial);
                     } else {
-                      Serial.printf("Progress: %d%%\n", (Update.progress()*100)/Update.size());
+                      logger.printf("Progress: %d%%\n", (Update.progress()*100)/Update.size());
                     }
 
                     if (final) {
@@ -93,8 +97,8 @@ void setup_ota_update() {
                       if (!Update.end(true)){
                         Update.printError(Serial);
                       } else {
-                        Serial.println("Update complete");
-                        Serial.flush();
+                        logger.println("Update complete");
+                        // logger.flush();
                         ESP.restart();
                       }
                     }
@@ -106,7 +110,7 @@ void setup_ota_update() {
  * Callback to get captive-portal messages
 */
 void captive_portal_message(const char* msg, ESPEasyCfgMessageType type) {
-  Serial.println(msg);
+  logger.println(msg);
 }
 
 /**
@@ -243,19 +247,19 @@ void mqtt_reconnect() {
     IPAddress mqttServerIP;
     int ret = WiFi.hostByName(mqttServer.getValue().c_str(), mqttServerIP);
     if(ret != 1){
-      Serial.print("Unable to resolve hostname: ");
-      Serial.print(mqttServer.getValue().c_str());
-      Serial.println(" try again in 5 seconds");
+      logger.print("Unable to resolve hostname: ");
+      logger.print(mqttServer.getValue().c_str());
+      logger.println(" try again in 5 seconds");
       lastMQTTConAttempt = millis();
       return;
     }
-    Serial.print("Attempting MQTT connection to ");
-    Serial.print(mqttServer.getValue().c_str());
-    Serial.print(':');
-    Serial.print(mqttPort.getValue());
-    Serial.print('(');
-    Serial.print(mqttServerIP);
-    Serial.print(")...");
+    logger.print("Attempting MQTT connection to ");
+    logger.print(mqttServer.getValue().c_str());
+    logger.print(':');
+    logger.print(mqttPort.getValue());
+    logger.print('(');
+    logger.print(mqttServerIP);
+    logger.print(")...");
     // Create a Client ID baased on MAC address
     byte mac[6];                     // the MAC address of your Wifi shield
     WiFi.macAddress(mac);
@@ -266,7 +270,7 @@ void mqtt_reconnect() {
     // Attempt to connect
     client.setServer(mqttServerIP, mqttPort.getValue());
     if((ret == 1) && (client.connect(clientId.c_str(), mqttUser.getValue().c_str(), mqttPass.getValue().c_str()))) {
-      Serial.println("connected");
+      logger.println("connected");
       mqttState = MQTTConState::Connected;
       //Subscribe to MQTT topics
       client.subscribe((mqttFanService + "/mode").c_str());
@@ -275,9 +279,9 @@ void mqtt_reconnect() {
       client.subscribe((mqttFanService + "/auto_on_temp").c_str());
       client.subscribe((mqttFanService + "/set").c_str());
     } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
+      logger.print("failed, rc=");
+      logger.print(client.state());
+      logger.println(" try again in 5 seconds");
       client.disconnect();
       mqttState = MQTTConState::Disconnected;
       lastMQTTConAttempt = millis();
@@ -371,7 +375,7 @@ void fan_process() {
 */
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting awesome fan controller!");
+  logger.println("Starting awesome fan controller!");
   //Setup I/O
   setup_inputs_outputs();
   //OTA
@@ -397,12 +401,12 @@ void loop() {
       mqtt_reconnect();
     }
   }
-  
+  bool prevFans = fansOn;
   // Call process
   fan_process();
 
   //Publish to MQTT if it's time to do
-  if(publishToMQTT && ((now-mqttLastPostTime)>mqttPostingInterval)){
+  if(publishToMQTT && (((now-mqttLastPostTime)>mqttPostingInterval) || (prevFans != fansOn))){
     publishValuesToMQTT();
     mqttLastPostTime = now;
   }
@@ -412,5 +416,5 @@ void loop() {
     lastParameterChange = 0;
     captivePortal.saveParameters();
   }
-  yield();
+  delay(10);
 }
