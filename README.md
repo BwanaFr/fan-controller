@@ -14,8 +14,8 @@ Here is a summary of microcontroller pinout (feel free to edit pin_config.h to c
 
 | Name        | Pin number | Description                         |
 |-------------|------------|-------------------------------------|
-|PIN_FAN1     | 17         | Fan 1 PWM output                    |
-|PIN_FAN2     | 3          | Fan 2 PWM output                    |
+|PIN_FAN1     | 3          | Fan 1 PWM output                    |
+|PIN_FAN2     | 4          | Fan 2 PWM output                    |
 |PIN_TEMP_1   | 15         | One wire bus of temperature probe 1 |
 |PIN_TEMP_2   | 16         | One wire bus of temperature probe 2 |
 |PIN_FORCE_ON | 9          | Input to force fan on (pull to GND) |

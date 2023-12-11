@@ -19,8 +19,12 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
+#include "StaticContent.h"
+
 //ESPEasyCfg objects
 AsyncWebServer server(80);
+AsyncEventSource events("/status");
+
 ESPEasyCfg captivePortal(&server, "Fan");
 ESPEasyCfgParameterGroup mqttParamGrp("MQTT");
 ESPEasyCfgParameter<String> mqttServer(mqttParamGrp, "mqttServer", "MQTT server", "server.local");
@@ -42,6 +46,9 @@ WiFiClient espClient;                                   // TCP client
 PubSubClient client(espClient);                         // MQTT object
 const unsigned long mqttPostingInterval = 10L * 1000L;  // Delay between updates, in milliseconds
 static unsigned long mqttLastPostTime = 0;              // Last time you sent to the server, in milliseconds
+const unsigned long eventPostingInterval = 5L * 1000L;  // Delay between updates, in milliseconds
+static unsigned long eventLastPostTime = 0;              // Last time you sent to the server, in milliseconds
+
 String mqttStatusService;                               // Status publishing service.
 String mqttFanService;                                  // Fan 1 MQTT service prefix
 
@@ -55,6 +62,8 @@ OperatingMode operatingMode = OperatingMode::Off;         // Fan operating mode
 static unsigned long lastParameterChange = 0;             // Last time one saved parameter was changed (to delay the saving)
 const unsigned long delayedParameterSaving = 10L * 1000L; // Delay before saving parameters to flash
 bool fansOn = false;                                      // Are fans on?
+double percentFan1 = 0.0;                                 // Fan 1 percentage
+double percentFan2 = 0.0;                                 // Fan 2 percentage
 double temperature1 = 0.0;                                // Temperature 1 sensor value
 double temperature2 = 0.0;                                // Temperature 2 sensor value
 bool autoOnReached = false;                               // Threshold reached in auto mode
@@ -62,6 +71,15 @@ bool autoOnReached = false;                               // Threshold reached i
 static size_t otaContentLenght=0;                    // Size of the OTA update file
 
 Logger logger;
+
+
+/**
+ * Setup status page
+*/
+void setup_status_page() {
+  registerStaticFiles(&server);
+  server.addHandler(&events);
+}
 
 /**
  * Setups OTA update
@@ -169,7 +187,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
       if(data == "on" || data == "true"){
         changeMode("Forced");
       }else{
-        changeMode("Off");        
+        changeMode("Off");
       }
     }
   }
@@ -189,7 +207,7 @@ void mqtt_setup(){
       //Build MQTT service names
     mqttStatusService =  mqttName.getValue() +  "/status";
     mqttFanService = mqttName.getValue();
-    
+
     //Setup MQTT client callbacks and port
     client.setServer(mqttServer.getValue().c_str(), mqttPort.getValue());
     client.setCallback(mqtt_callback);
@@ -212,7 +230,7 @@ void new_cp_state(ESPEasyCfgState state) {
       mqtt_setup();
       mqttLastPostTime = 0;
       client.disconnect();
-    }    
+    }
   }
 }
 
@@ -242,7 +260,7 @@ void mqtt_reconnect() {
     return;
   }
   // Loop until we're reconnected
-  if (!client.connected() && ((millis()-lastMQTTConAttempt)>5000)) {   
+  if (!client.connected() && ((millis()-lastMQTTConAttempt)>5000)) {
     mqttState = MQTTConState::Connecting;
     IPAddress mqttServerIP;
     int ret = WiFi.hostByName(mqttServer.getValue().c_str(), mqttServerIP);
@@ -315,6 +333,24 @@ void publishValuesToMQTT(){
 }
 
 /**
+ * Publishes value to web event
+*/
+void publishValuesToEvent(){
+  //Publish to MQTT clients
+  if(client.connected()){
+    String msg;
+    StaticJsonDocument<210> root;
+    root["temp1"] = temperature1;
+    root["temp2"] = temperature2;
+    root["fan1Speed"] = percentFan1;
+    root["fan2Speed"] = percentFan2;
+    root["mode"] = operMode.toString();
+    serializeJson(root, msg);
+    events.send(msg.c_str(), "value", millis());
+  }
+}
+
+/**
  * Main process for fan
 */
 void fan_process() {
@@ -345,18 +381,18 @@ void fan_process() {
     break;
   case OperatingMode::Forced:
     fansOn = true;
-    break;  
+    break;
   default:
     break;
   }
   if(fansOn){
-    double percentFan1 = fanPercent.getValue() + fan1Offset.getValue();
+    percentFan1 = fanPercent.getValue() + fan1Offset.getValue();
     if(percentFan1 > 100.0){
       percentFan1 = 100.0;
     }else if(percentFan1 < 0.0){
       percentFan1 = 0.0;
     }
-    double percentFan2 = fanPercent.getValue() + fan2Offset.getValue();
+    percentFan2 = fanPercent.getValue() + fan2Offset.getValue();
     if(percentFan2 > 100.0){
       percentFan2 = 100.0;
     }else if(percentFan2 < 0.0){
@@ -380,6 +416,8 @@ void setup() {
   setup_inputs_outputs();
   //OTA
   setup_ota_update();
+  //Setup the status webpage
+  setup_status_page();
   //Initialize captive portal
   captive_portal_setup();
   //Initialize MQTT
@@ -392,7 +430,7 @@ unsigned long lastBlink = 0;
 void loop() {
   unsigned long now = millis();
   bool publishToMQTT = false;
-  
+
   //MQTT loop
   if (mqttState != MQTTConState::NotUsed){
     publishToMQTT = client.loop();
@@ -409,6 +447,11 @@ void loop() {
   if(publishToMQTT && (((now-mqttLastPostTime)>mqttPostingInterval) || (prevFans != fansOn))){
     publishValuesToMQTT();
     mqttLastPostTime = now;
+  }
+
+  if((now-eventLastPostTime) >= eventPostingInterval){
+    publishValuesToEvent();
+    eventLastPostTime = now;
   }
 
   //Delayed parameter saving

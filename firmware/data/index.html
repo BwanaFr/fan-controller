@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fan controller</title>
+	<!-- <link rel="stylesheet" href="../www/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous"> -->
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+  </head>
+<body>
+<div class="container">
+	<div class="row justify-content-center">
+		<div class="col-md-auto">
+			<h1>Fan controller</h1>
+		</div>
+	</div>
+	<div class="row justify-content-center p-2">
+		<div class="col-md-auto">
+			<div class="card" style="width: 18rem;">
+			<div class="card-header">Temperature 1</div>
+			<div class="card-body text-center p-2">
+				<h4><span class="badge badge-light" id="temp1">23&deg;C</span></h4>
+			</div>
+		  </div>
+		</div>
+		<div class="col-md-auto">
+			<div class="card h-100" style="width: 18rem;">
+			<div class="card-header">Temperature 2</div>
+			<div class="card-body text-center p-2">
+			  <h4><span class="badge badge-light" id="temp2">3&deg;C</span></h4>
+			</div>
+		  </div>
+		</div>
+	</div>
+	<div class="row justify-content-center p-2">
+		<div class="col-md-auto">
+			<div class="card" style="width: 18rem;">
+			<div class="card-header">Fan 1 speed</div>
+			<div class="card-body text-center p-2">
+				<h4><span class="badge badge-light" id="fan1Speed">0%</span></h4>
+			</div>
+		  </div>
+		</div>
+		<div class="col-md-auto">
+			<div class="card" style="width: 18rem;">
+			<div class="card-header">Fan 2 speed</div>
+			<div class="card-body text-center p-2">
+				<h4><span class="badge badge-light" id="fan2Speed">0%</span></h4>
+			</div>
+		  </div>
+		</div>
+	</div>
+	<div class="row justify-content-center">
+		<div class="col-md-auto">
+			<div class="card" style="width: 18rem;">
+			<div class="card-header">Operating mode</div>
+			<div class="card-body text-center p-2">
+				<h4><span class="badge badge-light" id="opMode">Auto</span></h4>
+			</div>
+		  </div>
+		</div>
+	</div>
+</div>
+<!--
+<script src="../www/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+<script src="../www/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+<script src="../www/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+-->
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+<script>
+var evtSource = new EventSource("/data");
+	evtSource.addEventListener("value", function(e) {
+	  	let data = JSON.parse(e.data);
+		$('#temp1').html(data.temp1 + '&deg;C');
+		$('#temp2').html(data.temp2 + '&deg;C');
+		$('#fan1Speed').html(data.fan1Speed + '%');
+		$('#fan2Speed').html(data.fan2Speed + '%');
+		$('#opMode').html(data.opMode);
+	}, false);
+</script>
+</body>
+</html>
