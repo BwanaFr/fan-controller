@@ -72,12 +72,14 @@ static size_t otaContentLenght=0;                    // Size of the OTA update f
 
 Logger logger;
 
-
+extern const uint8_t index_data[] asm("_binary_data_index_html_start");
 /**
  * Setup status page
 */
 void setup_status_page() {
-  registerStaticFiles(&server);
+  captivePortal.setRootHandler([](AsyncWebServerRequest *request){
+    request->send(200, "text/html", (char*)index_data);
+  });
   server.addHandler(&events);
 }
 
@@ -336,18 +338,16 @@ void publishValuesToMQTT(){
  * Publishes value to web event
 */
 void publishValuesToEvent(){
-  //Publish to MQTT clients
-  if(client.connected()){
-    String msg;
-    StaticJsonDocument<210> root;
-    root["temp1"] = temperature1;
-    root["temp2"] = temperature2;
-    root["fan1Speed"] = percentFan1;
-    root["fan2Speed"] = percentFan2;
-    root["mode"] = operMode.toString();
-    serializeJson(root, msg);
-    events.send(msg.c_str(), "value", millis());
-  }
+  //Publish to web clients
+  String msg;
+  StaticJsonDocument<210> root;
+  root["temp1"] = temperature1;
+  root["temp2"] = temperature2;
+  root["fan1Speed"] = percentFan1;
+  root["fan2Speed"] = percentFan2;
+  root["mode"] = operMode.toString();
+  serializeJson(root, msg);
+  events.send(msg.c_str(), "value", millis());
 }
 
 /**
