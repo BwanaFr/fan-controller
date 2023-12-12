@@ -77,7 +77,7 @@ extern const uint8_t index_data[] asm("_binary_data_index_html_start");
  * Setup status page
 */
 void setup_status_page() {
-  captivePortal.setRootHandler([](AsyncWebServerRequest *request){
+  server.on("/www/index.html", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(200, "text/html", (char*)index_data);
   });
   server.addHandler(&events);
@@ -398,12 +398,12 @@ void fan_process() {
     }else if(percentFan2 < 0.0){
       percentFan2 = 0.0;
     }
-    set_fan_speed(1, percentFan1);
-    set_fan_speed(2, percentFan2);
   }else{
-    set_fan_speed(1, 0.0);
-    set_fan_speed(2, 0.0);
+    percentFan1 = 0.0;
+    percentFan2 = 0.0;
   }
+  set_fan_speed(1, percentFan1);
+  set_fan_speed(2, percentFan2);
 }
 
 /**
