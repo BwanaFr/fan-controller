@@ -1,0 +1,2 @@
+# Part of my Homeassistant configuration to have fan-controller integrated
+mqtt: !include_dir_merge_named mqtt

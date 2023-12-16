@@ -1,0 +1,10 @@
+    - name: "Fan mode"
+      command_topic: "Fan/mode"
+      state_topic: "Fan/status"
+      value_template: "{{ value_json.mode }}"
+      icon: mdi:fan
+      json_attributes_topic: "Fan/status"
+      options:
+        - "Off"
+        - "Auto"
+        - "Forced"

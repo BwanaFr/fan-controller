@@ -1,0 +1,9 @@
+    - name: "Fan speed"
+      command_topic: "Fan/percentage"
+      min: 0
+      max: 100
+      state_topic: "Fan/status"
+      value_template: "{{ value_json.percentage }}"
+      icon: mdi:fan
+      json_attributes_topic: "Fan/status"
+      unit_of_measurement: '%'

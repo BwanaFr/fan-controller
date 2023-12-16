@@ -1,0 +1,8 @@
+  sensor:
+    !include_dir_merge_list sensors
+  number:
+    !include_dir_merge_list numbers
+  select:
+    !include_dir_merge_list selects
+  binary_sensor:
+    !include_dir_merge_list binary_sensors
