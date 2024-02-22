@@ -1,0 +1,15 @@
+#Fireplace fan sensors
+    - name: "Fan inlet temperature"
+      state_topic: "Fan/status"
+      value_template: "{{ value_json.temperature1 }}"
+      icon: mdi:thermometer
+      json_attributes_topic: "Fan/status"
+      device_class: temperature
+      unit_of_measurement: '°C'
+    - name: "Fan outlet temperature"
+      state_topic: "Fan/status"
+      value_template: "{{ value_json.temperature2 }}"
+      icon: mdi:thermometer
+      json_attributes_topic: "Fan/status"
+      device_class: temperature
+      unit_of_measurement: '°C'

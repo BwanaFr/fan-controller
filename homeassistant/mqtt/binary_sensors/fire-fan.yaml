@@ -1,0 +1,8 @@
+#Fireplace fan sensors
+    - name: "Fan status"
+      state_topic: "Fan/status"
+      value_template: "{{ value_json.state }}"
+      icon: mdi:fan
+      json_attributes_topic: "Fan/status"
+      payload_off: "off"
+      payload_on: "on"
