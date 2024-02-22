@@ -246,9 +246,12 @@ void captive_portal_setup() {
   //Finally, add our parameter group to the captive portal
   captivePortal.addParameterGroup(&mqttParamGrp);
   captivePortal.addParameterGroup(&fanParamGrp);
-  // captivePortal.setLedPin(PIN_USER_LED);
+#ifdef USE_LED
+  captivePortal.setLedPin(PIN_USER_LED);
+#endif
   captivePortal.setMessageHandler(captive_portal_message);
   captivePortal.setStateHandler(new_cp_state);
+
   //Start our captive portal (if not configured)
   //At first usage, you will find a new WiFi network named "Heater"
   captivePortal.begin();
